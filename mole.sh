@@ -11,11 +11,16 @@ export LC_ALL=C
 # Define values
 FILE_EXIST=false
 DIR_EXIST=false
-GROUP_EXIST=false
 LOG="$MOLE_RC"
+a_date=""
+b_date=""
+list_arg=false
+secret_log_arg=false
+m_arg=false
+g_arg=false
 
 
-# Error 
+# Error $MOLE_RC not set
 if [ -z "$MOLE_RC" ]; then
 	echo "Error: MOLE_RC is not set."
 	exit 25
@@ -67,20 +72,19 @@ open_file(){
 	case $# in
 	2)
 		#vi $FILE
-		if [[ $FILE_EXIST == true &&  $list_arg == false ]]; then
+		
+		if [[ $FILE_EXIST == true &&  $list_arg == false &&  $m_arg == false ]]; then
   			printf "%s: %s : %s : %s\n" "$(basename "$FILE")" "-" "$DATETIME_N" "$(pwd)"  >> "$LOG"
   		else
   			filters $2
 		fi
-		
-		
-		;;
+			;;
 	3)
 		GROUP=$OPTARG
-		GROUP_EXIST=true
 		#vi $FILE
-		printf "%s: %s : %s : %s\n" "$(basename "$FILE")" "$GROUP" "$DATETIME_N" "$(pwd)">> "$LOG"	
-			
+		if [[ $list_arg == false &&  $m_arg == false ]]; then 
+			printf "%s: %s : %s : %s\n" "$(basename "$FILE")" "$GROUP" "$DATETIME_N" "$(pwd)">> "$LOG"
+		fi
 		
 		;;
 	esac
@@ -89,92 +93,90 @@ open_file(){
 # Define filters functions
 filters(){
 	# separating string by char=','
-	IFS=',' read -ra g_filter <<< "$1"
-	arr_count=${#g_filter[@]}
-	
+	IFS=',' read -ra array <<< "$1"
 	
 	if [ "$DIR_EXIST" == false ]; then
-		DIR_1=$(pwd)
+	    DIR_1=$(pwd)
 	else 
-		DIR_1=$DIR
+	    DIR_1=$DIR
 	fi
 	
-	
-	FILTER=$(awk -v a_date="$a_date" -v b_date="$b_date" -v dir="$DIR_1" -v g_filter="${g_filter[*]}" -v arr_count="$arr_count" '
-	BEGIN {
-		split(g_filter, array_filters, " ")
-	}
-	{
-		if (b_date != "" && a_date != "") {
+	FILTER=$(awk -v a_date="$a_date" -v b_date="$b_date" -v dir="$DIR_1" -v arr="$(echo "${array[@]}")" '
+	    BEGIN {
+	    	n = split(arr, filters, " ");
+	    }
+	    {
+	    	if (b_date != null && a_date != null) {
 			if ((substr($4, 1, 10) >= a_date && substr($4, 1, 10) <= b_date) && dir == $6) {
-				if( length(array_filters) > 0 )
+				if( n > 0 )
 				{
-					for (i=1; i <= arr_count; i++) {
-						if (array_filters[i] == $2) {
-							printf "%-20s %-10s %s\n", $1, $2, $6
+					for (i=1; i <= n; i++) {
+						if (filters[i] == $2) {
+							printf "%s %s %s\n", $1, $2, $6
 						
 						}
 					}
 				}
-				else if(a_date == null && dir == $6)
+				else if(dir == $6)
 				{
-					printf "%-20s %-10s %s\n", $1, $2, $6
+					printf "%s %s %s\n", $1, $2, $6
 				}
 			}
 		}
-		else if (b_date == "") 
+		else if (b_date == null) 
 		{
 			if (a_date <= substr($4, 1, 10) && dir == $6) 
 			{
-				if( length(array_filters) > 0 )
+				if( n > 0 )
 				{
-					for (i=1; i <= arr_count; i++) {
-						if (array_filters[i] == $2) {
-							printf "%-20s %-10s %s\n", $1, $2, $6
+					for (i=1; i <= n; i++) {
+						if (filters[i] == $2) {
+							printf "%s %s %s\n", $1, $2, $6
 						
 						}
 					}
 				}
 				else
 				{
-					printf "%-20s %-10s %s\n", $1, $2, $6
+					printf "%s %s %s\n", $1, $2, $6
 				}
 				
 			}
 			else if(a_date == null && dir == $6)
 			{
-				printf "%-20s %-10s %s\n", $1, $2, $6
+				printf "%s %s %s\n", $1, $2, $6
 			}
 		}	
-		else if (a_date == "") 
+		else if (a_date == null) 
 		{
 			if (substr($4, 1, 10) <= b_date && dir == $6) 
 			{ 
-				if( length(array_filters) > 0 )
+				if( n > 0 )
 				{
-					for (i=1; i <= arr_count; i++) {
-						if (array_filters[i] == $2) {
-							printf "%-20s %-10s %s\n", $1, $2, $6
+					for (i=1; i <= n; i++) {
+						if (filters[i] == $2) {
+							printf "%s %s %s\n", $1, $2, $6
 						
 						}
 					}
 				}
 				else
 				{
-					printf "%-20s %-10s %s\n", $1, $2, $6
+					printf "%s %s %s\n", $1, $2, $6
 				}
 			} 
 			else if(b_date == null && dir == $6)
 			{
-				printf "%-20s %-10s %s\n", $1, $2, $6
+				printf "%s %s %s\n", $1, $2, $6
 			}
-		}
-		else
-		{
-			printf "Empty list"
 		}
 	}' "$LOG")
 	
+	if [[ $FILTER == "" ]]; then
+		#FILTER="Empty_list"
+		echo "List is empty" >&2
+		exit 3
+	fi
 }
 
 
@@ -192,14 +194,13 @@ case $1 in
 	
 		# secret-log
 		secret_log_arg=true
-		exit
+		shift
 		;;
 	-m)	
 		m_arg=true
 		shift
 		;;
 	*)	
-	
 		# No command specified, default to opening a file
 		for i in 1
 		do
@@ -231,33 +232,41 @@ case $1 in
 esac
 
 # Parse command-line arguments
-while getopts "hg:m:b:a:" opt; do
+while getopts ":g:m:b:a:h" opt; do
     case $opt in
     	a)	
-    		# Checks if its a date or not
 		if [[ "$OPTARG" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
 			a_date=$OPTARG
 		else
 			echo "Error: '$OPTARG' is not a date" >&2
 			exit 27 
 		fi
+		
+		#shift $((OPTIND - 1))
 		;;
-	
-	b)
-		# Error Checks if its a date or not
+	 b)
 		if [[ "$OPTARG" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
 			b_date=$OPTARG
 		else
 			echo "Error: '$OPTARG' is not a date" >&2
 			exit 27 
 		fi
-		;;  
-	
+		
+		#shift $((OPTIND -1))
+		;;
 	h)
 		print_help
 		exit
 		;;
 	g)
+		g_arg=true
+		for i in $(seq 1 $#); do
+  			if [ "${!i}" = "-g" ];then
+  				arg_g_count=$i
+  			fi
+		done
+		shift $(($arg_g_count - 1))
+		
 		open_file $1 $2 $3 
 		;;
 	
@@ -277,16 +286,38 @@ while getopts "hg:m:b:a:" opt; do
     
 done
 
+#
 if [[ $list_arg == true ]]; then
-	filters
-	echo "$FILTER" | awk '{ printf "%-20s %-10s\n", $1, $2 }'
+
+	if [[ $g_arg == true ]]; then
+		filters $2
+	else
+		filters
+	fi
+	echo "$FILTER" | awk '{ printf "%s %s\n", $1, $2 }'| column -t 
+	
 elif [[ $secret_log_arg == true ]]; then
+	echo "secret-log"
 	if [ ! -d "$HOME/.mole" ]; then
 		mkdir "$HOME/.mole"
 	fi
-elif [[ $m_arg == true ]]; then
+	
 	
 	filters
+	echo "$FILTER"
+	
+	#> ~/.mole/log_"$USER"_"$DATETIME".bz2
+	
+elif [[ $m_arg == true ]]; then
+	
+	if [[ $g_arg == true ]]; then
+		filters $2
+	else
+		filters
+	fi
+	
+	echo "$FILTER" | awk '{ printf "%s %s\n", $1, $2 }'| column -t 
+	
 	sort_filter=$(printf "%s\n" "$FILTER" | uniq -c | sort -nr | awk '{
 		printf "%s\n", $2
 	}' |
@@ -298,7 +329,7 @@ elif [[ $m_arg == true ]]; then
 	if [ -f "$sort_filter" ];then
 		vi $sort_filter
 	else
-		echo "Error: File not exist" >&2
+		echo "Error: File - '$sort_filter' not exist" >&2
 		exit 3
 	fi
 	
