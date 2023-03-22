@@ -95,19 +95,35 @@ filters(){
 	# separating string by char=','
 	IFS=',' read -ra array <<< "$1"
 	
-	if [ "$DIR_EXIST" == false ]; then
-	    DIR_1=$(pwd)
+	if [[ "$DIR_EXIST" == false && $secret_log_arg == false ]]; then
+		DIR_1=$(pwd)
+	elif [ $secret_log_arg == true ]; then
+		DIR_1=""
 	else 
-	    DIR_1=$DIR
+		DIR_1=$DIR
 	fi
+	
 	
 	FILTER=$(awk -v a_date="$a_date" -v b_date="$b_date" -v dir="$DIR_1" -v arr="$(echo "${array[@]}")" '
 	    BEGIN {
 	    	n = split(arr, filters, " ");
+	    	
+		if(dir == null)
+		{
+			dir_null=1
+		}
+		else
+		{
+			dir_null=0
+		}
+		
 	    }
 	    {
+				
+	    	
 	    	if (b_date != null && a_date != null) {
-			if ((substr($4, 1, 10) >= a_date && substr($4, 1, 10) <= b_date) && dir == $6) {
+
+			if ((substr($4, 1, 10) >= a_date && substr($4, 1, 10) <= b_date) && (dir == $6 || dir_null == 1)) {
 				if( n > 0 )
 				{
 					for (i=1; i <= n; i++) {
@@ -117,7 +133,7 @@ filters(){
 						}
 					}
 				}
-				else if(dir == $6)
+				else if((dir == $6 || dir_null == 1))
 				{
 					printf "%s %s %s\n", $1, $2, $6
 				}
@@ -125,7 +141,8 @@ filters(){
 		}
 		else if (b_date == null) 
 		{
-			if (a_date <= substr($4, 1, 10) && dir == $6) 
+
+			if (a_date <= substr($4, 1, 10) && (dir == $6 || dir_null == 1)) 
 			{
 				if( n > 0 )
 				{
@@ -142,14 +159,15 @@ filters(){
 				}
 				
 			}
-			else if(a_date == null && dir == $6)
+			else if(a_date == null && (dir == $6 || dir_null == 1))
 			{
 				printf "%s %s %s\n", $1, $2, $6
 			}
 		}	
 		else if (a_date == null) 
 		{
-			if (substr($4, 1, 10) <= b_date && dir == $6) 
+
+			if (substr($4, 1, 10) <= b_date && (dir == $6 || dir_null == 1)) 
 			{ 
 				if( n > 0 )
 				{
@@ -165,7 +183,7 @@ filters(){
 					printf "%s %s %s\n", $1, $2, $6
 				}
 			} 
-			else if(b_date == null && dir == $6)
+			else if(b_date == null && (dir == $6 || dir_null == 1))
 			{
 				printf "%s %s %s\n", $1, $2, $6
 			}
@@ -297,14 +315,14 @@ if [[ $list_arg == true ]]; then
 	echo "$FILTER" | awk '{ printf "%s %s\n", $1, $2 }'| column -t 
 	
 elif [[ $secret_log_arg == true ]]; then
-	echo "secret-log"
+
 	if [ ! -d "$HOME/.mole" ]; then
 		mkdir "$HOME/.mole"
 	fi
 	
 	
 	filters
-	echo "$FILTER"
+	echo "$FILTER" | awk '{ printf "%s;%s\n", $3, $2 }'
 	
 	#> ~/.mole/log_"$USER"_"$DATETIME".bz2
 	
