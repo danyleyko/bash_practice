@@ -325,7 +325,7 @@ if [[ $list_arg == true ]]; then
 	
 	shift $((OPTIND - 1 )) 
 	# Error
-	if [[ ! -d $1  ]]; then
+	if [[ ! -d $1  && $DIR_EXIST == true ]]; then
 		echo "Error: You write '$1' which not exist" >&2
 		exit
 	fi
@@ -354,7 +354,7 @@ elif [[ $secret_log_arg == true ]]; then
 	
 	shift $((OPTIND - 1 )) 
 	# Error
-	if [[ ! -d $1  ]]; then
+	if [[ ! -d $1 && $DIR_EXIST == true ]]; then
 		echo "Error: You write '$1' which not exist" >&2
 		exit
 	fi
@@ -363,21 +363,31 @@ elif [[ $secret_log_arg == true ]]; then
 	if [[ $FILTER == "List is empty" ]]; then
 		echo "$FILTER" 
 	else
-		echo "$FILTER" | awk '{ printf "%s;%s\n", $5, $3 }'
+		echo "$FILTER" | awk '{ printf "%s %s %s\n", $1, $5, $3}' | sort | uniq -c | awk '{ 
+		printf "%s;%s\n", $3 ,$4 
+		}'| bzip2 > ~/.mole/log_"$USER"_"$(date +"%Y-%m-%d_%H-%M-%S")".bz2
+		
+		
 	fi
 	
 	
-	#> ~/.mole/log_"$USER"_"$DATETIME".bz2
+	
 	
 elif [[ $m_arg == true ]]; then
 	
-	if [[ $g_arg == true ]]; then
+	if [[ $g_arg == true && $DIR_EXIST == true ]]; then
+		filters $2 $DIR
+		
+	elif [[ $g_arg == false && $DIR_EXIST == true ]]; then 
+		filters $DIR
+		
+	elif [[ $g_arg == true && $DIR_EXIST == false ]]; then 
 		filters $2
-	else
+		
+	else	
 		filters
+		
 	fi
-	
-	echo "$FILTER" | awk '{ printf "%s %s\n", $1, $2 }'| column -t 
 	
 	sort_filter=$(printf "%s\n" "$FILTER" | uniq -c | sort -nr | awk '{
 		printf "%s\n", $2
@@ -385,7 +395,6 @@ elif [[ $m_arg == true ]]; then
 	head -n 1 |
 	sed 's/:$//' |
 	xargs echo)
-	
 	
 	if [ -f "$sort_filter" ];then
 		vi $sort_filter
